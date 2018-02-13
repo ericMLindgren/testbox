@@ -9,34 +9,25 @@ import (
 	"strings"
 )
 
-// type languageDetail struct {
-// 	Boilerplate   string `json:"boilerplate"`
-// 	CommentPrefix string `json:"commentPrefix"`
-// }
 type languageDetail struct {
-	// Compiler           string `json:"compiler"`
-	// SourceFile         string `json:"sourceFile"`
-	// OptionalExecutable string `json:"optionalExecutable"`
-	// CompilerFlags      string `json:"compilerFlags"`
 	Boilerplate   string `json:"boilerplate"`
 	CommentPrefix string `json:"commentPrefix"`
-	// Disabled           string `json:"disabled"`
 }
 
 var languages map[string]languageDetail
-var cbPort, cbAddress string
+var cbAddress string
 
 func main() {
-	// Read settings. Compilebox address/port and this address/port
-	var portOk, addressOk bool
-	cbPort, portOk = os.LookupEnv("COMPILEBOX_PORT")
-	cbAddress, addressOk = os.LookupEnv("COMPILEBOX_ADDRESS")
+	// Read settings. Compilebox address/port
+	port, portOk := os.LookupEnv("COMPILEBOX_PORT")
+	address, addressOk := os.LookupEnv("COMPILEBOX_ADDRESS")
 	if !portOk || !addressOk {
 		log.Fatal("Missing compilebox environment variables, please make sure service is available")
 	}
+	cbAddress = address + ":" + port
 
 	// Check to ensure the compilebox is up by trying to fill langs variable
-	fmt.Printf("Requesting language list from compilebox (%s:%s)...\n", cbAddress, cbPort)
+	fmt.Printf("Requesting language list from compilebox (%s)...\n", cbAddress)
 	populateLanguages()
 
 	/* Serve REST API endpoints for
@@ -49,23 +40,19 @@ func main() {
 
 	*/
 
-	port := getEnv("TESTBOX_PORT", "31336")
-
 	// http.HandleFunc("/get_challenge/", getChallenge)
 	// http.HandleFunc("/submit/", submitTest)
 	// http.HandleFunc("/stdout/", getStdout)
 	// http.HandleFunc("/languages/", getLangs)
+	// http.HandleFunc("/", frontPage)
 
+	port = getEnv("TESTBOX_PORT", "31336")
 	fmt.Println("testbox listening on " + port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 
 	/* Serve administrative interface for challenge collection
 
 	 */
-}
-
-func cbPath(path string) string {
-	return cbAddress + ":" + cbPort + path
 }
 
 func getEnv(key, fallback string) string {
@@ -79,7 +66,7 @@ func getEnv(key, fallback string) string {
 }
 
 func populateLanguages() {
-	r, err := http.Get(cbPath("/languages/"))
+	r, err := http.Get(cbAddress + "/languages/")
 
 	if err != nil {
 		log.Fatal("Unable to contact compilebox, please ensure service is available")
