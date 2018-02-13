@@ -7,11 +7,20 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"challenges"
 )
 
 type languageDetail struct {
 	Boilerplate   string `json:"boilerplate"`
 	CommentPrefix string `json:"commentPrefix"`
+}
+
+type CodeSubmission struct {
+	Language    string   `json:"language"`
+	Code        string   `json:"code"`
+	Stdins      []string `json:"input"`
+	ChallengeId string   `json:"challengeId`
 }
 
 var languages map[string]languageDetail
@@ -40,9 +49,9 @@ func main() {
 
 	*/
 
-	// http.HandleFunc("/get_challenge/", getChallenge)
-	// http.HandleFunc("/submit/", submitTest)
-	// http.HandleFunc("/stdout/", getStdout)
+	http.HandleFunc("/get_challenge/", getChallenge)
+	http.HandleFunc("/submit/", submitToChallenge)
+	http.HandleFunc("/stdout/", getStdout)
 	// http.HandleFunc("/languages/", getLangs)
 	// http.HandleFunc("/", frontPage)
 
@@ -55,14 +64,36 @@ func main() {
 	 */
 }
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
+func getChallenge(w http.ResponseWriter, r *http.Request) {
+	c := challenges.Get()
 
-	fmt.Printf("Environment variable %s not found, setting to %s\n", key, fallback)
-	os.Setenv(key, fallback)
-	return fallback
+	buf, _ := json.MarshalIndent(c, "", "   ")
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
+func getStdout(w http.ResponseWriter, r *http.Request) {
+	log.Println("Received stdout-only code submission...")
+	decoder := json.NewDecoder(r.Body)
+	var submission CodeSubmission
+	err := decoder.Decode(&submission)
+	if err != nil {
+		panic(err)
+	}
+	defer r.Body.Close()
+}
+
+func submitToChallenge(w http.ResponseWriter, r *http.Request) {
+	log.Print("Received code submission for challenge...")
+	decoder := json.NewDecoder(r.Body)
+	var submission CodeSubmission
+	err := decoder.Decode(&submission)
+	if err != nil {
+		panic(err)
+	}
+	defer r.Body.Close()
+	log.Printf("Code targets challenge %s", submission.ChallengeId)
 }
 
 func populateLanguages() {
@@ -89,4 +120,14 @@ func populateLanguages() {
 		supportedLangs = append(supportedLangs, fmt.Sprintf("%s", k))
 	}
 	fmt.Printf("Supporting: %s\n", strings.Join(supportedLangs, ", "))
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+
+	fmt.Printf("Environment variable %s not found, setting to %s\n", key, fallback)
+	os.Setenv(key, fallback)
+	return fallback
 }
