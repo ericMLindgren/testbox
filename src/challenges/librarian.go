@@ -13,7 +13,7 @@ var challenges map[Id]Challenge
 
 func GetRandom() Challenge {
 	rand.Seed(time.Now().UTC().UnixNano())
-	n := rand.Intn(len(challenges))
+	n := rand.Intn(len(challenges)-1) + 1 // TODO -1 +1 needed because there is no challenge 0, FIX
 	id := strconv.Itoa(n)
 	return challenges[id]
 
