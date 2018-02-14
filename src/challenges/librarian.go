@@ -11,7 +11,7 @@ import (
 
 var challenges map[Id]Challenge
 
-func Get() Challenge {
+func GetRandom() Challenge {
 	rand.Seed(time.Now().UTC().UnixNano())
 	n := rand.Intn(len(challenges))
 	id := strconv.Itoa(n)

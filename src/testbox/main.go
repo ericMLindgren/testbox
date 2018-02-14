@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -19,8 +20,20 @@ type languageDetail struct {
 type CodeSubmission struct {
 	Language    string   `json:"language"`
 	Code        string   `json:"code"`
-	Stdins      []string `json:"input"`
+	Stdins      []string `json:"stdins"`
 	ChallengeId string   `json:"challengeId`
+}
+
+type ExecutionResult struct {
+	Stdouts []string          `json:"stdouts"`
+	Graded  map[string]string `json:"graded,omitempty"`
+	Message message           `json:"message"`
+}
+
+// Message ...
+type message struct {
+	Type string `json:"type"`
+	Data string `json:"data"`
 }
 
 var languages map[string]languageDetail
@@ -52,7 +65,7 @@ func main() {
 	http.HandleFunc("/get_challenge/", getChallenge)
 	http.HandleFunc("/submit/", submitToChallenge)
 	http.HandleFunc("/stdout/", getStdout)
-	// http.HandleFunc("/languages/", getLangs)
+	http.HandleFunc("/languages/", getLangs)
 	// http.HandleFunc("/", frontPage)
 
 	port = getEnv("TESTBOX_PORT", "31336")
@@ -64,24 +77,77 @@ func main() {
 	 */
 }
 
-func getChallenge(w http.ResponseWriter, r *http.Request) {
-	c := challenges.Get()
+func getLangs(w http.ResponseWriter, r *http.Request) {
+	log.Println("Received languages list request")
+	// langs := make(map[string]sandbox.Language)
 
-	buf, _ := json.MarshalIndent(c, "", "   ")
+	// for k, v := range box.LanguageMap {
+	// 	langs[k] = sandbox.Language{Boilerplate: v.Boilerplate, CommentPrefix: v.CommentPrefix}
+	// }
+
+	// add boilerplate and comment info
+	// log.Println(langs)
+
+	buf, _ := json.MarshalIndent(languages, "", "   ")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(buf)
 }
 
+func getChallenge(w http.ResponseWriter, r *http.Request) {
+	c := challenges.GetRandom()
+
+	buf, _ := json.MarshalIndent(c, "", "   ")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
 func getStdout(w http.ResponseWriter, r *http.Request) {
-	log.Println("Received stdout-only code submission...")
+	fmt.Print("Received stdout-only code submission...")
+
+	// decode submission
 	decoder := json.NewDecoder(r.Body)
 	var submission CodeSubmission
 	err := decoder.Decode(&submission)
+	defer r.Body.Close()
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("with stdin: %s\n", submission.Stdins[0])
+	// send to compilebox
+	result := execCodeSubmission(submission)
+
+	// encode result
+	buf, _ := json.MarshalIndent(result, "", "   ")
+
+	// write result to client
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
+func execCodeSubmission(s CodeSubmission) ExecutionResult {
+	// encode submission
+	jsonBytes, _ := json.MarshalIndent(s, "", "   ")
+	buf := bytes.NewBuffer(jsonBytes)
+
+	// send code to compilebox
+	r, err := http.Post(cbAddress+"/eval/", "application/json", buf)
+	if err != nil {
+		panic(err)
+	}
+
+	// decode response
+	decoder := json.NewDecoder(r.Body)
+	var result ExecutionResult
+	err = decoder.Decode(&result)
 	defer r.Body.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	// return result
+	return result
 }
 
 func submitToChallenge(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +159,7 @@ func submitToChallenge(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	defer r.Body.Close()
+
 	log.Printf("Code targets challenge %s", submission.ChallengeId)
 }
 
