@@ -17,23 +17,32 @@ type languageDetail struct {
 	CommentPrefix string `json:"commentPrefix"`
 }
 
+// CodeSubmission describes a snippet of executable code, the language it's in, and any stdins that should be piped in.
+// CodeSubmission optionally contains the id of the challenge it should be tested against
 type CodeSubmission struct {
-	Language    string   `json:"language"`
-	Code        string   `json:"code"`
-	Stdins      []string `json:"stdins"`
-	ChallengeId string   `json:"challengeId,omitempty`
+	Language    string        `json:"language"`
+	Code        string        `json:"code"`
+	Stdins      []string      `json:"stdins"`
+	ChallengeId challenges.ID `json:"challengeId,omitempty`
 }
 
+// ExecutionResult contains the outputs (stdouts) of submitted code, as well as an compiler messages (Message).
+// ExecutionResult may contain a grade for the code if the code was tested against a challenge
 type ExecutionResult struct {
 	Stdouts []string          `json:"stdouts"`
 	Graded  map[string]string `json:"graded,omitempty"`
 	Message message           `json:"message"`
 }
 
-// Message ...
 type message struct {
 	Type string `json:"type"`
 	Data string `json:"data"`
+}
+
+type apiResponse struct {
+	ErrorMessage string        `json:"error,omitempty"`
+	ID           challenges.ID `json:"id,omitempty"`
+	Result       interface{}   `json:"result,omitempty"`
 }
 
 var languages map[string]languageDetail
@@ -50,31 +59,132 @@ func main() {
 
 	// Check to ensure the compilebox is up by trying to fill langs variable
 	fmt.Printf("Requesting language list from compilebox (%s)...\n", cbAddress)
-	populateLanguages()
+	languages = fetchLanguages()
 
-	/* Serve REST API endpoints for
+	// routes for admin of challenge db
+	http.HandleFunc("/challenges/id/", getChallenge)
+	http.HandleFunc("/challenges/insert/", insertChallenge)
+	http.HandleFunc("/challenges/delete/", deleteChallenge)
+	http.HandleFunc("/challenges/update/", updateChallenge)
 
-	- various challenge searches
+	// routes for requesting challenges
+	http.HandleFunc("/challenges/rand/", getRandChallenge)
+	http.HandleFunc("/challenges/all/", getAllChallenges)
+	// http.HandleFunc("/challenges/search/", searchChallenges)
 
-	- simple code submission (just pass along to testbox)
+	// get list of supported languages:
+	http.HandleFunc("/languages/", getLangs)
 
-	- code submission checked against challenge
-
-	*/
-
-	http.HandleFunc("/get_challenge/", getChallenge)
+	// routes for submitting code
 	http.HandleFunc("/submit/", submitToChallenge)
 	http.HandleFunc("/stdout/", getStdout)
-	http.HandleFunc("/languages/", getLangs)
+
+	// front page, should have admin login and project info
 	// http.HandleFunc("/", frontPage)
 
 	port = getEnv("TESTBOX_PORT", "31336")
 	fmt.Println("testbox listening on " + port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
 
-	/* Serve administrative interface for challenge collection
+// TODO standardize error messaging
+func getChallenge(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Received insert request")
 
-	 */
+	var id challenges.ID
+	decodeSubmission(r, &id)
+
+	fmt.Printf("Challenge id: %s\n", id)
+
+	c, err := challenges.GetById(id)
+
+	resp := apiResponse{Result: c}
+	if err != nil {
+		resp.ErrorMessage = err.Error()
+	}
+
+	buf, _ := json.MarshalIndent(resp, "", "   ")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
+func insertChallenge(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Received insert request")
+
+	var c challenges.Challenge
+	decodeSubmission(r, &c)
+
+	fmt.Printf("Challenge struct: %v\n", c)
+
+	id, err := challenges.Insert(&c)
+
+	resp := apiResponse{ID: id}
+	if err != nil {
+		resp.ErrorMessage = err.Error()
+	}
+
+	buf, _ := json.MarshalIndent(resp, "", "   ")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
+func updateChallenge(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Received insert request")
+
+	var c challenges.Challenge
+	decodeSubmission(r, &c)
+
+	fmt.Printf("Challenge struct: %v\n", c)
+
+	// TODO this is broken
+	err := challenges.Update(c.ID, &c)
+	if err != nil {
+		// TODO this should get passed to client.
+		panic(err)
+	}
+
+	temp := "How to handle responses?"
+
+	buf, _ := json.MarshalIndent(temp, "", "   ")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
+func deleteChallenge(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Received insert request")
+
+	var id challenges.ID
+	decodeSubmission(r, &id)
+
+	// fmt.Printf("Challenge struct: %v\n", c)
+
+	err := challenges.Delete(id)
+	if err != nil {
+		// TODO this should get passed to client.
+		panic(err)
+	}
+
+	temp := "How to handle responses?"
+
+	buf, _ := json.MarshalIndent(temp, "", "   ")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
+func getRandChallenge(w http.ResponseWriter, r *http.Request) {
+	c := challenges.GetRandom()
+
+	buf, _ := json.MarshalIndent(c, "", "   ")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
+}
+
+func getAllChallenges(w http.ResponseWriter, r *http.Request) {
+	c := challenges.GetAll()
+
+	buf, _ := json.MarshalIndent(c, "", "   ")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(buf)
 }
 
 func getLangs(w http.ResponseWriter, r *http.Request) {
@@ -86,19 +196,13 @@ func getLangs(w http.ResponseWriter, r *http.Request) {
 	w.Write(buf)
 }
 
-func getChallenge(w http.ResponseWriter, r *http.Request) {
-	c := challenges.GetRandom()
-
-	buf, _ := json.MarshalIndent(c, "", "   ")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
-}
-
 func getStdout(w http.ResponseWriter, r *http.Request) {
 	fmt.Print("Received stdout-only code submission...")
 
 	// decode submission
-	submission := decodeSubmission(r)
+
+	var submission CodeSubmission
+	decodeSubmission(r, &submission)
 
 	fmt.Printf("with stdin: %s\n", submission.Stdins[0])
 
@@ -112,13 +216,19 @@ func getStdout(w http.ResponseWriter, r *http.Request) {
 func submitToChallenge(w http.ResponseWriter, r *http.Request) {
 	fmt.Print("Received code submission for challenge...")
 
-	submission := decodeSubmission(r)
+	var submission CodeSubmission
+	decodeSubmission(r, &submission)
 
 	fmt.Printf("Code targets challenge %s", submission.ChallengeId)
 	fmt.Println(submission)
 
 	// attach the appropriate challenge's stdins to the submission
-	stdins, expectedStdouts := challenges.GetById(submission.ChallengeId).GetIOSplit()
+	c, err := challenges.GetById(submission.ChallengeId)
+	if err != nil {
+		panic(err) // TODO handle error more gracefully and pass along to user
+	}
+
+	stdins, expectedStdouts := c.GetIOSplit()
 	submission.Stdins = stdins
 
 	// send to compilebox
@@ -153,7 +263,7 @@ func gradeResults(ins, exp, actual []string) map[string]string {
 	return graded
 }
 
-func populateLanguages() {
+func fetchLanguages() map[string]languageDetail {
 	r, err := http.Get(cbAddress + "/languages/")
 
 	if err != nil {
@@ -163,20 +273,19 @@ func populateLanguages() {
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 
-	// b := make([]byte, 256)
-	// _, _ = r.Body.Read(b)
-	// fmt.Printf("response: %s", b)
-
-	err = decoder.Decode(&languages)
+	var l map[string]languageDetail
+	err = decoder.Decode(&l)
 	if err != nil {
 		panic(err)
 	}
 
-	supportedLangs := make([]string, 0, len(languages))
-	for k := range languages {
+	supportedLangs := make([]string, 0, len(l))
+	for k := range l {
 		supportedLangs = append(supportedLangs, fmt.Sprintf("%s", k))
 	}
 	fmt.Printf("Supporting: %s\n", strings.Join(supportedLangs, ", "))
+
+	return l
 }
 
 func execCodeSubmission(s CodeSubmission) ExecutionResult {
@@ -212,15 +321,15 @@ func jsonWrite(v interface{}, w http.ResponseWriter) {
 	w.Write(buf)
 }
 
-func decodeSubmission(r *http.Request) CodeSubmission {
+func decodeSubmission(r *http.Request, s interface{}) {
 	decoder := json.NewDecoder(r.Body)
-	var submission CodeSubmission
-	err := decoder.Decode(&submission)
+	// var submission CodeSubmission
+	err := decoder.Decode(&s)
 	defer r.Body.Close()
 	if err != nil {
 		panic(err)
 	}
-	return submission
+	// return submission
 }
 
 func getEnv(key, fallback string) string {

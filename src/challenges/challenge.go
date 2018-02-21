@@ -1,44 +1,52 @@
 package challenges
 
-type Id = string
+// _ "github.com/jinzhu/gorm/dialects/mysql"
+// _ "github.com/jinzhu/gorm/dialects/sqlite"
+
+// ID is a string to identify challenges
+type ID = int64
 
 // Challenge - Defines challenge object
 type Challenge struct {
-	Id          string            `json:"id"`
-	Description string            `json:"description"`
-	IO          map[string]string `json:"io"`
-	SampleIO    string            `json:"sampleIO"`
+	// gorm.Model // takes care of ID and some other record keeping
+	ID        ID       `json:"id"`
+	Name      string   `json:"name"`
+	ShortDesc string   `json:"shortDesc"`
+	LongDesc  string   `json:"longDesc"`
+	Tags      tagList  `json:"tags"`
+	Cases     caseList `json:"cases"`
+	SampleIO  caseList `json:"sampleIO"`
 }
 
-func (c Challenge) GetIOSplit() ([]string, []string) {
-	ins := make([]string, len(c.IO))
-	outs := make([]string, len(c.IO))
+type testCase struct {
+	Desc   string `json:"desc,omitempty"`
+	Input  string `json:"input"`
+	Expect string `json:"expect"`
+}
 
-	var j int
-	for i, o := range c.IO {
-		ins[j] = i
-		outs[j] = o
-		j++
+type tagList []string
+type caseList []testCase
+
+func dummyChallenge() *Challenge {
+	return &Challenge{
+		Name:      "Dummy Challenge",
+		ShortDesc: "A dummy challenge for testing purposes",
+		LongDesc:  "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Deleniti libero, illo laborum, minus quisquam iusto animi neque explicabo! Commodi perspiciatis hic et cum exercitationem error voluptatum doloribus itaque consequuntur nisi!",
+		Tags:      tagList{"dummy", "test", "useless"},
+		Cases:     caseList{testCase{"dummy", "a", "a"}},
+		SampleIO:  caseList{testCase{"", "a", "a"}},
+	}
+}
+
+// GetIOSplit splits the IO map of in -> out into two separate slices
+func (c Challenge) GetIOSplit() ([]string, []string) {
+	ins := make([]string, len(c.SampleIO))
+	outs := make([]string, len(c.SampleIO))
+
+	for i, c := range c.SampleIO {
+		ins[i] = c.Input
+		outs[i] = c.Expect
 	}
 
 	return ins, outs
 }
-
-// func (c *Challenge) StringifyCases(sep string) (string, string) {
-// 	inputs := make([]string, len(c.IO))
-// 	outputs := make([]string, len(c.IO))
-
-// 	log.Printf("getCases, challenge: %v\n", c)
-// 	i := 0
-// 	for k, v := range c.IO {
-// 		inputs[i] = k
-// 		outputs[i] = v
-// 		i++
-// 	}
-
-// 	return joinAndAppend(inputs, sep), joinAndAppend(outputs, sep)
-// }
-
-// func joinAndAppend(sl []string, endChar string) string {
-// 	return strings.Join(sl, endChar) + endChar
-// }

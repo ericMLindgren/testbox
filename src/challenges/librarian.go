@@ -1,54 +1,209 @@
 package challenges
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"log"
+	"database/sql"
+	"fmt"
 	"math/rand"
-	"strconv"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-var challenges map[Id]Challenge
+// Basic CRUD API
 
-func GetRandom() Challenge {
-	rand.Seed(time.Now().UTC().UnixNano())
-	n := rand.Intn(len(challenges)-1) + 1 // TODO -1 +1 needed because there is no challenge 0, FIX
-	id := strconv.Itoa(n)
-	return challenges[id]
+func GetById(id ID) (Challenge, error) {
+	var c Challenge
+	err := db.QueryRow("SELECT * FROM challenges WHERE id = ?", id).Scan(&c.ID, &c.Name, &c.ShortDesc, &c.LongDesc, &c.Tags, &c.Cases, &c.SampleIO)
+	if err != nil {
+		fmt.Printf("GetById error: %s", err.Error())
+	}
 
-	// return challenges["1"]
+	return c, err
 }
 
-func GetById(i Id) Challenge {
-	return challenges[i]
+func Insert(c *Challenge) (ID, error) {
+	// fmt.Println("Insert not implemented")
+	// should create a new record and return the id of said record
+	res, err := db.Exec(
+		"insert into challenges (name, short_desc, long_desc, tags, sampleIO, cases) values (?, ?, ?, ?, ?, ?);",
+		c.Name, c.ShortDesc, c.LongDesc, c.Tags, c.SampleIO, c.Cases,
+	)
+	if err != nil {
+		fmt.Printf("insert failed: %s", err.Error())
+		return -1, err
+	}
+
+	id, _ := res.LastInsertId()
+	// Set challenge objects ID to match TODO is this a good approach? seems side-effect-y
+	c.ID = id
+	fmt.Printf("success! entry key: %d\n", id)
+	return id, err
+}
+
+func Update(id ID, c *Challenge) error {
+	_, err := db.Exec(
+		"UPDATE challenges SET name = ?, short_desc = ?, long_desc = ?, tags = ?, sampleIO = ?, cases = ? WHERE id = ?;",
+		c.Name, c.ShortDesc, c.LongDesc, c.Tags, c.SampleIO, c.Cases, id)
+	if err != nil {
+		fmt.Printf("update error: %s\n", err.Error())
+	}
+	return err
+}
+
+func Delete(id ID) error {
+	res, err := db.Exec("DELETE FROM challenges WHERE id = ?", id)
+	if err != nil {
+		fmt.Printf("delete error: %s\n", err.Error())
+	}
+	r, _ := res.RowsAffected()
+	if r > 0 {
+		fmt.Printf("entry %d deleted\n", id)
+	} else {
+		fmt.Printf("delete error: entry %d not found\n", id)
+	}
+	return nil
+}
+
+// Specialized retrieval methods
+
+func GetRandom() Challenge {
+	n := rand.Intn(countChallenges()-1) + 1 // TODO -1 +1 needed because there is no challenge 0, FIX
+	id := int64(n)
+	c, _ := GetById(id) // handle error TODO
+	return c
 }
 
 func GetByTag() {
 
 }
 
-func GetAll() map[Id]Challenge {
-	return challenges
+func GetAll() []Challenge {
+	fmt.Println("Retrieving all entries...")
+	rows, err := db.Query("SELECT * FROM challenges")
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	results := make([]Challenge, 0)
+	for rows.Next() {
+		var e Challenge
+		err = rows.Scan(&e.ID, &e.Name, &e.ShortDesc, &e.LongDesc, &e.Tags, &e.Cases, &e.SampleIO)
+		if err != nil {
+			panic(err)
+		}
+
+		results = append(results, e)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Entries retrieved")
+
+	return results
 }
 
+// TODO handle graceful closing
+
+var db *sql.DB
+
+// should not be done in init but in delirate method call TODO
 func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+
 	// This should connect to SQL database and perform
 	// some check to verify connection
+	fmt.Print("Connecting to database...")
+	var err error
+	db, err = sql.Open("sqlite3", "./data/challenges.db")
+	// db = db.Debug()
+	if err != nil {
+		panic("failed to connect to database")
+	}
+	defer db.Close()
+	fmt.Printf("DB contains %d challenge(s)\n", countChallenges())
 
-	log.Println("Reading challenges file...")
-	bytes, err := ioutil.ReadFile("data/challenges.json")
+	resetChallengeTable()
+
+	fmt.Println("inserting dummy challenge...")
+	dummy1 := dummyChallenge()
+	id, _ := Insert(dummy1)
+	_ = id
+
+	c, _ := GetById(id)
+	fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
+
+	dummy2 := dummy1
+	dummy2.Name = "Not so dumb"
+	fmt.Println("Updating!")
+	Update(id, dummy2)
+
+	c, _ = GetById(id)
+	fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
+
+	// fmt.Printf("challenge count: %d\n", countChallenges())
+	// fmt.Println("testing delete...")
+	// Delete(25)
+	// Delete(id)
+	// fmt.Printf("challenge count: %d\n", countChallenges())
+
+	// c, _ = GetById(id)
+	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
+
+}
+
+func CloseDB() {
+	db.Close()
+}
+
+func countChallenges() int {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM challenges").Scan(&count)
 	if err != nil {
 		panic(err)
 	}
 
-	challenges = make(map[Id]Challenge)
-	err = json.Unmarshal(bytes, &challenges)
+	return count
+}
+
+func resetChallengeTable() {
+	removeChallengeTable()
+	err := initChallengesTable()
 	if err != nil {
 		panic(err)
 	}
-	log.Println("Challenges file loaded.")
-	// for k, v := range challenges {
-	// 	log.Printf("Id: %s maps to %s", k, v.Id)
-	// }
+}
+
+func removeChallengeTable() {
+	fmt.Println("Removing old challenges table...")
+	sqlStatement := `DROP TABLE challenges`
+	_, err := db.Exec(sqlStatement)
+	if err != nil {
+		fmt.Printf("error removing table: %s", err.Error())
+	}
+	fmt.Println("Table removed")
+}
+
+func initChallengesTable() error {
+	fmt.Println("Creating challenges table (if it doesn't exist)...")
+	sqlStatement := `
+		CREATE TABLE IF NOT EXISTS challenges (
+		id INTEGER PRIMARY KEY,
+		name TEXT UNIQUE NOT NULL,
+		short_desc TEXT NOT NULL,
+		long_desc TEXT,
+		tags TEXT,
+		sampleIO TEXT NOT NULL,
+		cases TEXT NOT NULL
+		);`
+
+	_, err := db.Exec(sqlStatement)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Challenge table created")
+	return nil
 }
