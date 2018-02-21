@@ -26,12 +26,34 @@ type CodeSubmission struct {
 	ChallengeId challenges.ID `json:"challengeId,omitempty`
 }
 
+func (c CodeSubmission) String() string {
+	str := "<CodeSubmission> "
+	if c.ChallengeId > -1 {
+		str += fmt.Sprintf("ChallengeID: %d", c.ChallengeId)
+	}
+	str += "\n"
+	str += fmt.Sprintf("Lang: %s\n", c.Language)
+	str += fmt.Sprintf("Stdins: %s\n", c.Stdins)
+	str += fmt.Sprintf("Code: Hidden\n")
+	return str
+}
+
 // ExecutionResult contains the outputs (stdouts) of submitted code, as well as an compiler messages (Message).
 // ExecutionResult may contain a grade for the code if the code was tested against a challenge
 type ExecutionResult struct {
-	Stdouts []string          `json:"stdouts"`
-	Graded  map[string]string `json:"graded,omitempty"`
-	Message message           `json:"message"`
+	Stdouts []string `json:"stdouts"`
+	Graded  []grade  `json:"graded,omitempty"`
+	Message message  `json:"message"`
+}
+
+type grade struct {
+	Case   challenges.TestCase `json:"case"`
+	Actual string              `json:"actual"`
+	Grade  string              `json:"grade"`
+}
+
+func (g grade) String() string {
+	return fmt.Sprintf("<grade>Case Expects: '%s' Actual: '%s' Grade: %s", g.Case.Expect, g.Actual, g.Grade)
 }
 
 type message struct {
@@ -81,6 +103,9 @@ func main() {
 
 	// front page, should have admin login and project info
 	// http.HandleFunc("/", frontPage)
+
+	challenges.OpenDB()
+	defer challenges.CloseDB()
 
 	port = getEnv("TESTBOX_PORT", "31336")
 	fmt.Println("testbox listening on " + port)
@@ -214,12 +239,12 @@ func getStdout(w http.ResponseWriter, r *http.Request) {
 }
 
 func submitToChallenge(w http.ResponseWriter, r *http.Request) {
-	fmt.Print("Received code submission for challenge...")
+	fmt.Println("Received code submission for challenge...")
 
 	var submission CodeSubmission
 	decodeSubmission(r, &submission)
 
-	fmt.Printf("Code targets challenge %s", submission.ChallengeId)
+	// fmt.Printf("Code targets challenge %d", submission.ChallengeId)
 	fmt.Println(submission)
 
 	// attach the appropriate challenge's stdins to the submission
@@ -228,37 +253,37 @@ func submitToChallenge(w http.ResponseWriter, r *http.Request) {
 		panic(err) // TODO handle error more gracefully and pass along to user
 	}
 
-	stdins, expectedStdouts := c.GetIOSplit()
+	stdins, _ := c.GetIOSplit()
 	submission.Stdins = stdins
 
 	// send to compilebox
 	result := execCodeSubmission(submission)
 
 	// compare stdouts to challenges stdouts
-	fmt.Printf("about to grade, expecting %v\n", expectedStdouts)
-	result.Graded = gradeResults(stdins, expectedStdouts, result.Stdouts)
-
+	// fmt.Printf("about to grade, expecting %v\n", expectedStdouts)
+	// result.Graded = gradeResults(stdins, expectedStdouts, result.Stdouts)
+	result.Graded = gradeResults(c.Cases, result.Stdouts)
+	fmt.Printf("Suspect challenge: %v", c)
+	fmt.Printf("Done grading results: %v", result.Graded)
 	// encode and write result back to client
 	jsonWrite(result, w)
 }
 
 // TODO consider that grading in strings should be done client side and that testbox side it should be bools?
-func gradeResults(ins, exp, actual []string) map[string]string {
-	graded := make(map[string]string)
-	for i, e := range exp {
-		// if we've run out of results, fail. This should never happen but would cause index error if it did
-		// if i > len(actual)-1 {
-		// 	graded[e] = "Fail"
-		// 	continue
-		// }
-		thisIn := ins[i]
+// type gradeMap map[challenges.TestCase]string
 
-		if e != actual[i] {
-			graded[thisIn] = "Fail"
+func gradeResults(cases challenges.CaseList, actual []string) []grade {
+	graded := make([]grade, len(cases))
+	for i, c := range cases {
+		graded[i] = grade{Case: c, Actual: actual[i]}
+		result := cases[i].Expect == actual[i]
+
+		if !result {
+			graded[i].Grade = "Fail"
 			continue
 		}
 
-		graded[thisIn] = "Pass"
+		graded[i].Grade = "Pass"
 	}
 	return graded
 }

@@ -13,7 +13,7 @@ import (
 
 func GetById(id ID) (Challenge, error) {
 	var c Challenge
-	err := db.QueryRow("SELECT * FROM challenges WHERE id = ?", id).Scan(&c.ID, &c.Name, &c.ShortDesc, &c.LongDesc, &c.Tags, &c.Cases, &c.SampleIO)
+	err := db.QueryRow("SELECT * FROM challenges WHERE id = ?", id).Scan(&c.ID, &c.Name, &c.ShortDesc, &c.LongDesc, &c.Tags, &c.SampleIO, &c.Cases)
 	if err != nil {
 		fmt.Printf("GetById error: %s", err.Error())
 	}
@@ -67,7 +67,7 @@ func Delete(id ID) error {
 // Specialized retrieval methods
 
 func GetRandom() Challenge {
-	n := rand.Intn(countChallenges()-1) + 1 // TODO -1 +1 needed because there is no challenge 0, FIX
+	n := rand.Intn(countChallenges()) + 1
 	id := int64(n)
 	c, _ := GetById(id) // handle error TODO
 	return c
@@ -110,7 +110,7 @@ func GetAll() []Challenge {
 var db *sql.DB
 
 // should not be done in init but in delirate method call TODO
-func init() {
+func OpenDB() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	// This should connect to SQL database and perform
@@ -122,11 +122,38 @@ func init() {
 	if err != nil {
 		panic("failed to connect to database")
 	}
-	defer db.Close()
 	fmt.Printf("DB contains %d challenge(s)\n", countChallenges())
 
 	resetChallengeTable()
 
+	fmt.Println("inserting dummy challenge...")
+	dummy1 := dummyChallenge()
+	id, _ := Insert(dummy1)
+	_ = id
+
+	// c, _ := GetById(id)
+	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
+
+	// dummy2 := dummy1
+	// dummy2.Name = "Not so dumb"
+	// fmt.Println("Updating!")
+	// Update(id, dummy2)
+
+	// c, _ = GetById(id)
+	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
+
+	// fmt.Printf("challenge count: %d\n", countChallenges())
+	// fmt.Println("testing delete...")
+	// Delete(25)
+	// Delete(id)
+	// fmt.Printf("challenge count: %d\n", countChallenges())
+
+	// c, _ = GetById(id)
+	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
+
+}
+
+func testDB() {
 	fmt.Println("inserting dummy challenge...")
 	dummy1 := dummyChallenge()
 	id, _ := Insert(dummy1)
@@ -151,7 +178,6 @@ func init() {
 
 	// c, _ = GetById(id)
 	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
-
 }
 
 func CloseDB() {

@@ -1,49 +1,59 @@
 package challenges
 
-// _ "github.com/jinzhu/gorm/dialects/mysql"
-// _ "github.com/jinzhu/gorm/dialects/sqlite"
+import "fmt"
 
 // ID is a string to identify challenges
 type ID = int64
 
 // Challenge - Defines challenge object
 type Challenge struct {
-	// gorm.Model // takes care of ID and some other record keeping
 	ID        ID       `json:"id"`
 	Name      string   `json:"name"`
 	ShortDesc string   `json:"shortDesc"`
 	LongDesc  string   `json:"longDesc"`
 	Tags      tagList  `json:"tags"`
-	Cases     caseList `json:"cases"`
-	SampleIO  caseList `json:"sampleIO"`
+	SampleIO  CaseList `json:"sampleIO"`
+	Cases     CaseList `json:"cases"`
 }
 
-type testCase struct {
-	Desc   string `json:"desc,omitempty"`
+func (c Challenge) String() string {
+	return fmt.Sprintf("ID: %d, Name: %s, ShortDesct: OMIT, LongDesc: OMIT, Tags: OMIT, Cases: %s, SampleIO: %s", c.ID, c.Name, c.Cases, c.SampleIO)
+}
+
+type TestCase struct {
 	Input  string `json:"input"`
 	Expect string `json:"expect"`
+	Desc   string `json:"desc,omitempty"`
+}
+
+func (t TestCase) String() string {
+	str := fmt.Sprintf("<TestCase> Input: %s Expect: %s ", t.Input, t.Expect)
+	if t.Desc != "" {
+		str += fmt.Sprintf("Desc: %s", t.Desc)
+	}
+	return str
 }
 
 type tagList []string
-type caseList []testCase
+type CaseList []TestCase
 
 func dummyChallenge() *Challenge {
 	return &Challenge{
-		Name:      "Dummy Challenge",
-		ShortDesc: "A dummy challenge for testing purposes",
-		LongDesc:  "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Deleniti libero, illo laborum, minus quisquam iusto animi neque explicabo! Commodi perspiciatis hic et cum exercitationem error voluptatum doloribus itaque consequuntur nisi!",
-		Tags:      tagList{"dummy", "test", "useless"},
-		Cases:     caseList{testCase{"dummy", "a", "a"}},
-		SampleIO:  caseList{testCase{"", "a", "a"}},
+		Name:      "Echo Stdin",
+		ShortDesc: "Simply echo stdin to stdout",
+		LongDesc:  "",
+		Tags:      tagList{"trivial"},
+		SampleIO:  CaseList{TestCase{"hello world", "hello world", ""}},
+		Cases:     CaseList{TestCase{"hello", "hello", ""}, TestCase{"123!?3", "123!?3", ""}, TestCase{", !.fe", ", !.fe", ""}},
 	}
 }
 
 // GetIOSplit splits the IO map of in -> out into two separate slices
 func (c Challenge) GetIOSplit() ([]string, []string) {
-	ins := make([]string, len(c.SampleIO))
-	outs := make([]string, len(c.SampleIO))
+	ins := make([]string, len(c.Cases))
+	outs := make([]string, len(c.Cases))
 
-	for i, c := range c.SampleIO {
+	for i, c := range c.Cases {
 		ins[i] = c.Input
 		outs[i] = c.Expect
 	}

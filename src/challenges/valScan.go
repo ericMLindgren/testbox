@@ -7,7 +7,7 @@ import (
 
 // we need these to implement scanners and valuers to convert types for db storage
 
-func (c caseList) Value() (driver.Value, error) {
+func (c CaseList) Value() (driver.Value, error) {
 	b, err := json.Marshal(c)
 	if err != nil {
 		panic(err)
@@ -15,9 +15,9 @@ func (c caseList) Value() (driver.Value, error) {
 	return string(b), nil
 }
 
-func (c *caseList) Scan(value interface{}) error {
+func (c *CaseList) Scan(value interface{}) error {
 	if value == nil {
-		*c = caseList{}
+		*c = CaseList{}
 		return nil
 	}
 
