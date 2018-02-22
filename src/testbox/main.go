@@ -64,7 +64,7 @@ type message struct {
 type apiResponse struct {
 	ErrorMessage string        `json:"error,omitempty"`
 	ID           challenges.ID `json:"id,omitempty"`
-	Result       interface{}   `json:"result,omitempty"`
+	Result       string        `json:"result,omitempty"`
 }
 
 var languages map[string]languageDetail
@@ -123,14 +123,13 @@ func getChallenge(w http.ResponseWriter, r *http.Request) {
 
 	c, err := challenges.GetById(id)
 
-	resp := apiResponse{Result: c}
+	resp := new(apiResponse)
 	if err != nil {
 		resp.ErrorMessage = err.Error()
 	}
+	resp.pack(c)
 
-	buf, _ := json.MarshalIndent(resp, "", "   ")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
+	jsonWrite(resp, w)
 }
 
 func insertChallenge(w http.ResponseWriter, r *http.Request) {
@@ -148,9 +147,7 @@ func insertChallenge(w http.ResponseWriter, r *http.Request) {
 		resp.ErrorMessage = err.Error()
 	}
 
-	buf, _ := json.MarshalIndent(resp, "", "   ")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
+	jsonWrite(resp, w)
 }
 
 func updateChallenge(w http.ResponseWriter, r *http.Request) {
@@ -163,16 +160,12 @@ func updateChallenge(w http.ResponseWriter, r *http.Request) {
 
 	// TODO this is broken
 	err := challenges.Update(c.ID, &c)
+	resp := apiResponse{}
 	if err != nil {
-		// TODO this should get passed to client.
-		panic(err)
+		resp.ErrorMessage = err.Error()
 	}
 
-	temp := "How to handle responses?"
-
-	buf, _ := json.MarshalIndent(temp, "", "   ")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
+	jsonWrite(resp, w)
 }
 
 func deleteChallenge(w http.ResponseWriter, r *http.Request) {
@@ -184,41 +177,38 @@ func deleteChallenge(w http.ResponseWriter, r *http.Request) {
 	// fmt.Printf("Challenge struct: %v\n", c)
 
 	err := challenges.Delete(id)
+	resp := apiResponse{}
 	if err != nil {
-		// TODO this should get passed to client.
-		panic(err)
+		resp.ErrorMessage = err.Error()
 	}
 
-	temp := "How to handle responses?"
-
-	buf, _ := json.MarshalIndent(temp, "", "   ")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
+	jsonWrite(resp, w)
 }
 
 func getRandChallenge(w http.ResponseWriter, r *http.Request) {
 	c := challenges.GetRandom()
+	resp := new(apiResponse)
+	resp.pack(c)
+	// if err != nil {
+	// 	resp.ErrorMessage = err.Error()
+	// }
 
-	buf, _ := json.MarshalIndent(c, "", "   ")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
+	jsonWrite(resp, w)
 }
 
 func getAllChallenges(w http.ResponseWriter, r *http.Request) {
 	c := challenges.GetAll()
+	resp := new(apiResponse)
+	resp.pack(c)
 
-	buf, _ := json.MarshalIndent(c, "", "   ")
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
+	jsonWrite(resp, w)
 }
 
 func getLangs(w http.ResponseWriter, r *http.Request) {
 	log.Println("Received languages list request")
-
-	buf, _ := json.MarshalIndent(languages, "", "   ")
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(buf)
+	resp := new(apiResponse)
+	resp.pack(languages)
+	jsonWrite(resp, w)
 }
 
 func getStdout(w http.ResponseWriter, r *http.Request) {
@@ -232,10 +222,15 @@ func getStdout(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("with stdin: %s\n", submission.Stdins[0])
 
 	// send to compilebox
-	result := execCodeSubmission(submission)
+	result, err := execCodeSubmission(submission)
+	resp := new(apiResponse)
+	if err != nil {
+		resp.ErrorMessage = err.Error()
+	}
+	resp.pack(result)
 
 	// encode and write result back to client
-	jsonWrite(result, w)
+	jsonWrite(resp, w)
 }
 
 func submitToChallenge(w http.ResponseWriter, r *http.Request) {
@@ -257,20 +252,29 @@ func submitToChallenge(w http.ResponseWriter, r *http.Request) {
 	submission.Stdins = stdins
 
 	// send to compilebox
-	result := execCodeSubmission(submission)
+	result, err := execCodeSubmission(submission)
 
 	// compare stdouts to challenges stdouts
 	// fmt.Printf("about to grade, expecting %v\n", expectedStdouts)
 	// result.Graded = gradeResults(stdins, expectedStdouts, result.Stdouts)
 	result.Graded = gradeResults(c.Cases, result.Stdouts)
-	fmt.Printf("Suspect challenge: %v", c)
-	fmt.Printf("Done grading results: %v", result.Graded)
+	// fmt.Printf("Suspect challenge: %v", c)
+	// fmt.Printf("Done grading results: %v", result.Graded)
 	// encode and write result back to client
-	jsonWrite(result, w)
+	resp := new(apiResponse)
+	if err != nil {
+		resp.ErrorMessage = err.Error()
+	}
+	resp.pack(result)
+	jsonWrite(resp, w)
 }
 
 // TODO consider that grading in strings should be done client side and that testbox side it should be bools?
 // type gradeMap map[challenges.TestCase]string
+func (r *apiResponse) pack(i interface{}) {
+	buf, _ := json.Marshal(i)
+	r.Result = string(buf)
+}
 
 func gradeResults(cases challenges.CaseList, actual []string) []grade {
 	graded := make([]grade, len(cases))
@@ -313,7 +317,7 @@ func fetchLanguages() map[string]languageDetail {
 	return l
 }
 
-func execCodeSubmission(s CodeSubmission) ExecutionResult {
+func execCodeSubmission(s CodeSubmission) (ExecutionResult, error) {
 	// encode submission
 	jsonBytes, _ := json.MarshalIndent(s, "", "   ")
 	buf := bytes.NewBuffer(jsonBytes)
@@ -321,20 +325,20 @@ func execCodeSubmission(s CodeSubmission) ExecutionResult {
 	// send code to compilebox
 	r, err := http.Post(cbAddress+"/eval/", "application/json", buf)
 	if err != nil {
-		panic(err)
+		fmt.Printf("error posting to compilebox: %s", err.Error())
 	}
 
 	// decode response
 	decoder := json.NewDecoder(r.Body)
 	var result ExecutionResult
-	err = decoder.Decode(&result)
+	derr := decoder.Decode(&result)
 	defer r.Body.Close()
-	if err != nil {
-		panic(err)
+	if derr != nil {
+		fmt.Printf("error decoding compilebox response: %s", derr.Error())
 	}
 
 	// return result
-	return result
+	return result, err
 }
 
 func jsonWrite(v interface{}, w http.ResponseWriter) {

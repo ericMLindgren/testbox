@@ -109,16 +109,12 @@ func GetAll() []Challenge {
 
 var db *sql.DB
 
-// should not be done in init but in delirate method call TODO
 func OpenDB() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	// This should connect to SQL database and perform
-	// some check to verify connection
 	fmt.Print("Connecting to database...")
 	var err error
 	db, err = sql.Open("sqlite3", "./data/challenges.db")
-	// db = db.Debug()
 	if err != nil {
 		panic("failed to connect to database")
 	}
@@ -128,29 +124,7 @@ func OpenDB() {
 
 	fmt.Println("inserting dummy challenge...")
 	dummy1 := dummyChallenge()
-	id, _ := Insert(dummy1)
-	_ = id
-
-	// c, _ := GetById(id)
-	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
-
-	// dummy2 := dummy1
-	// dummy2.Name = "Not so dumb"
-	// fmt.Println("Updating!")
-	// Update(id, dummy2)
-
-	// c, _ = GetById(id)
-	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
-
-	// fmt.Printf("challenge count: %d\n", countChallenges())
-	// fmt.Println("testing delete...")
-	// Delete(25)
-	// Delete(id)
-	// fmt.Printf("challenge count: %d\n", countChallenges())
-
-	// c, _ = GetById(id)
-	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
-
+	_, _ = Insert(dummy1)
 }
 
 func testDB() {
@@ -170,14 +144,14 @@ func testDB() {
 	c, _ = GetById(id)
 	fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
 
-	// fmt.Printf("challenge count: %d\n", countChallenges())
-	// fmt.Println("testing delete...")
-	// Delete(25)
-	// Delete(id)
-	// fmt.Printf("challenge count: %d\n", countChallenges())
+	fmt.Printf("challenge count: %d\n", countChallenges())
+	fmt.Println("testing delete...")
+	Delete(25)
+	Delete(id)
+	fmt.Printf("challenge count: %d\n", countChallenges())
 
-	// c, _ = GetById(id)
-	// fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
+	c, _ = GetById(id)
+	fmt.Printf("Retrieving challenge %d:\n%v\n", id, c)
 }
 
 func CloseDB() {
