@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"challenges"
+
+	"github.com/rs/cors"
 )
 
 type languageDetail struct {
@@ -23,13 +25,13 @@ type CodeSubmission struct {
 	Language    string        `json:"language"`
 	Code        string        `json:"code"`
 	Stdins      []string      `json:"stdins"`
-	ChallengeId challenges.ID `json:"challengeId,omitempty`
+	ChallengeID challenges.ID `json:"challengeId,omitempty`
 }
 
 func (c CodeSubmission) String() string {
 	str := "<CodeSubmission> "
-	if c.ChallengeId > -1 {
-		str += fmt.Sprintf("ChallengeID: %d", c.ChallengeId)
+	if c.ChallengeID > -1 {
+		str += fmt.Sprintf("ChallengeID: %d", c.ChallengeID)
 	}
 	str += "\n"
 	str += fmt.Sprintf("Lang: %s\n", c.Language)
@@ -70,6 +72,50 @@ type apiResponse struct {
 var languages map[string]languageDetail
 var cbAddress string
 
+// // main for production, no cors support as admin page is served here...
+// func main() {
+// 	// Read settings. Compilebox address/port
+// 	port, portOk := os.LookupEnv("COMPILEBOX_PORT")
+// 	address, addressOk := os.LookupEnv("COMPILEBOX_ADDRESS")
+// 	if !portOk || !addressOk {
+// 		log.Fatal("Missing compilebox environment variables, please make sure service is available")
+// 	}
+// 	cbAddress = address + ":" + port
+
+// 	// Check to ensure the compilebox is up by trying to fill langs variable
+// 	fmt.Printf("Requesting language list from compilebox (%s)...\n", cbAddress)
+// 	languages = fetchLanguages()
+
+// 	// routes for admin of challenge db
+// 	http.HandleFunc("/challenges/id/", getChallenge)
+// 	http.HandleFunc("/challenges/insert/", insertChallenge)
+// 	http.HandleFunc("/challenges/delete/", deleteChallenge)
+// 	http.HandleFunc("/challenges/update/", updateChallenge)
+
+// 	// routes for requesting challenges
+// 	http.HandleFunc("/challenges/rand/", getRandChallenge)
+// 	http.HandleFunc("/challenges/all/", getAllChallenges)
+// 	// http.HandleFunc("/challenges/search/", searchChallenges)
+
+// 	// get list of supported languages:
+// 	http.HandleFunc("/languages/", getLangs)
+
+// 	// routes for submitting code
+// 	http.HandleFunc("/submit/", submitToChallenge)
+// 	http.HandleFunc("/stdout/", getStdout)
+
+// 	// front page, should have admin login and project info
+// 	// http.HandleFunc("/", frontPage)
+
+// 	challenges.OpenDB()
+// 	defer challenges.CloseDB()
+
+// 	port = getEnv("TESTBOX_PORT", "31336")
+// 	fmt.Println("testbox listening on " + port)
+// 	log.Fatal(http.ListenAndServe(":"+port, nil))
+// }
+
+// main for testing challenge admin separtely, supports cors
 func main() {
 	// Read settings. Compilebox address/port
 	port, portOk := os.LookupEnv("COMPILEBOX_PORT")
@@ -83,33 +129,36 @@ func main() {
 	fmt.Printf("Requesting language list from compilebox (%s)...\n", cbAddress)
 	languages = fetchLanguages()
 
+	mux := http.NewServeMux()
 	// routes for admin of challenge db
-	http.HandleFunc("/challenges/id/", getChallenge)
-	http.HandleFunc("/challenges/insert/", insertChallenge)
-	http.HandleFunc("/challenges/delete/", deleteChallenge)
-	http.HandleFunc("/challenges/update/", updateChallenge)
+	mux.HandleFunc("/challenges/id/", getChallenge)
+	mux.HandleFunc("/challenges/insert/", insertChallenge)
+	mux.HandleFunc("/challenges/delete/", deleteChallenge)
+	mux.HandleFunc("/challenges/update/", updateChallenge)
 
 	// routes for requesting challenges
-	http.HandleFunc("/challenges/rand/", getRandChallenge)
-	http.HandleFunc("/challenges/all/", getAllChallenges)
-	// http.HandleFunc("/challenges/search/", searchChallenges)
+	mux.HandleFunc("/challenges/rand/", getRandChallenge)
+	mux.HandleFunc("/challenges/all/", getAllChallenges)
+	// mux.HandleFunc("/challenges/search/", searchChallenges)
 
 	// get list of supported languages:
-	http.HandleFunc("/languages/", getLangs)
+	mux.HandleFunc("/languages/", getLangs)
 
 	// routes for submitting code
-	http.HandleFunc("/submit/", submitToChallenge)
-	http.HandleFunc("/stdout/", getStdout)
+	mux.HandleFunc("/submit/", submitToChallenge)
+	mux.HandleFunc("/stdout/", getStdout)
 
 	// front page, should have admin login and project info
-	// http.HandleFunc("/", frontPage)
+	// http.HandleFunc("/", http.FileServer(http.Dir("./public/")))
+	// http.Handle("/", http.FileServer(http.Dir("./static")))
 
 	challenges.OpenDB()
 	defer challenges.CloseDB()
 
+	handler := cors.Default().Handler(mux)
 	port = getEnv("TESTBOX_PORT", "31336")
 	fmt.Println("testbox listening on " + port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, handler))
 }
 
 // TODO standardize error messaging
@@ -239,11 +288,11 @@ func submitToChallenge(w http.ResponseWriter, r *http.Request) {
 	var submission CodeSubmission
 	decodeSubmission(r, &submission)
 
-	// fmt.Printf("Code targets challenge %d", submission.ChallengeId)
+	// fmt.Printf("Code targets challenge %d", submission.ChallengeID)
 	fmt.Println(submission)
 
 	// attach the appropriate challenge's stdins to the submission
-	c, err := challenges.GetById(submission.ChallengeId)
+	c, err := challenges.GetById(submission.ChallengeID)
 	if err != nil {
 		panic(err) // TODO handle error more gracefully and pass along to user
 	}
@@ -343,7 +392,8 @@ func execCodeSubmission(s CodeSubmission) (ExecutionResult, error) {
 
 func jsonWrite(v interface{}, w http.ResponseWriter) {
 	// encode variable
-	buf, _ := json.MarshalIndent(v, "", "   ")
+	// buf, _ := json.MarshalIndent(v, "", "   ")
+	buf, _ := json.Marshal(v)
 
 	// write encoded variable to client
 	w.Header().Set("Content-Type", "application/json")
