@@ -149,10 +149,9 @@ func main() {
 	mux.HandleFunc("/stdout/", getStdout)
 
 	// front page, should have admin login and project info
-	fs := http.FileServer(http.Dir("front_end/build/"))
-	mux.Handle("/", fs)
-	// http.HandleFunc("/", http.FileServer(http.Dir("./public/")))
-	// http.Handle("/", http.FileServer(http.Dir("./static")))
+	// uncomment next two lines to enable open access to db
+	// fs := http.FileServer(http.Dir("front_end/build/"))
+	// mux.Handle("/", fs)
 
 	challenges.OpenDB()
 	defer challenges.CloseDB()
