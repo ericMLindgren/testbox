@@ -1,0 +1,27 @@
+.panel-title {
+	text-align: left;
+}
+
+.tag-list {
+	float: right;
+}
+
+.glyphicon {
+	margin-right: 10px;
+}
+
+.challenge-details-panel {
+	text-align: left;
+}
+
+.align-right {
+	text-align:right;
+}
+
+.top-margin-bump {
+	margin-top: 20px;
+}
+
+.no-padding-left {
+	padding-left:0px;
+}

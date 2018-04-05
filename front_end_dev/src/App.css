@@ -1,0 +1,90 @@
+.App {
+  position:absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display:flex;
+  flex-direction:column;
+  text-align: center;
+}
+
+.App-logo {
+  animation: App-logo-spin infinite 20s linear;
+  height: 80px;
+}
+
+.App-header {
+  background-color: #222;
+  height: 100px;
+  width:100%;
+  padding: 20px;
+  color: white;
+}
+
+.App-title {
+  font-size: 1.5em;
+}
+
+.App-intro {
+  font-size: large;
+}
+
+body {
+  background-color: #222;
+}
+.main-panel {
+  background-color:white;
+  margin: 0 50px 0px 50px;
+  padding: 30px;
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+  height:100%;
+}
+
+.main-box {
+  display:flex;
+  flex-direction: row;
+  height:100%;
+}
+
+.left-box {
+  position: relative;
+  flex-grow:4;
+  text-align: center;
+}
+
+.right-box {
+  flex-grow:1;
+  min-width: 40px;
+  max-width: 200px;
+  /*background-color: green;*/
+}
+
+.center-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 30%;
+  width: 50%;
+  margin: -15% 0 0 -25%;
+  /*border: 1px solid blue;*/
+}
+
+.challenge-card {
+  margin-top:20px;
+  border: 1px solid black;
+  text-align: left;
+  padding: 0px 20px 20px 20px;
+  /*padding-top:5px;*/
+  /*padding-left:20px;*/
+}
+
+.challenge-card h4 {
+  text-align: center;
+}
+
+@keyframes App-logo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

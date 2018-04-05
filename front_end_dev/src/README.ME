@@ -1,0 +1,26 @@
+App
+-Handles logic, retrieves entries from BE, holds state.
+State consists of:
+-allChallenges
+-showModal
+-modalFields
+-searchResults
+
+SearchAddBar
+-Input field that onchange looks for matches in corpus and creates new {results}
+and calls update() to re-render ChallengeList with new {results}. 
+Also has add button that triggers blank EditAddModal
+
+ChallengeList
+-Displays all challenges in an accordion, would like to display tags in addition to title. 
+
+Challenge
+-Displays challenge details as well as edit and delete
+
+EditAddModal
+-Display challenge with editable details, is blank for add
+and populated for edit. Edit should populate id (which indicates we update entry)
+and add should populate with id = -1 (which indicates we create new entry)
+
+update()
+-Recomposes list of challenges based on search results and renders ChallengeList with new data

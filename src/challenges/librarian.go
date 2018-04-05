@@ -77,30 +77,30 @@ func GetByTag() {
 
 }
 
-func GetAll() []Challenge {
-	fmt.Println("Retrieving all entries...")
+func GetAll() map[int64]Challenge {
+	// fmt.Println("Retrieving all entries...")
 	rows, err := db.Query("SELECT * FROM challenges")
 	if err != nil {
 		panic(err)
 	}
 	defer rows.Close()
 
-	results := make([]Challenge, 0)
+	results := make(map[int64]Challenge)
 	for rows.Next() {
 		var e Challenge
-		err = rows.Scan(&e.ID, &e.Name, &e.ShortDesc, &e.LongDesc, &e.Tags, &e.Cases, &e.SampleIO)
+		err = rows.Scan(&e.ID, &e.Name, &e.ShortDesc, &e.LongDesc, &e.Tags, &e.SampleIO, &e.Cases)
 		if err != nil {
 			panic(err)
 		}
 
-		results = append(results, e)
+		results[e.ID] = e
 	}
 
 	err = rows.Err()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Entries retrieved")
+	// fmt.Println("Entries retrieved")
 
 	return results
 }

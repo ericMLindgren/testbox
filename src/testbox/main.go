@@ -149,6 +149,8 @@ func main() {
 	mux.HandleFunc("/stdout/", getStdout)
 
 	// front page, should have admin login and project info
+	fs := http.FileServer(http.Dir("front_end/build/"))
+	mux.Handle("/", fs)
 	// http.HandleFunc("/", http.FileServer(http.Dir("./public/")))
 	// http.Handle("/", http.FileServer(http.Dir("./static")))
 
@@ -200,14 +202,14 @@ func insertChallenge(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateChallenge(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Received insert request")
+	fmt.Println("Received update request")
 
 	var c challenges.Challenge
 	decodeSubmission(r, &c)
 
 	fmt.Printf("Challenge struct: %v\n", c)
 
-	// TODO this is broken
+	// TODO this is broken... this note is not helpful. broken how?
 	err := challenges.Update(c.ID, &c)
 	resp := apiResponse{}
 	if err != nil {
@@ -218,7 +220,7 @@ func updateChallenge(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteChallenge(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Received insert request")
+	fmt.Println("Received delete request")
 
 	var id challenges.ID
 	decodeSubmission(r, &id)
