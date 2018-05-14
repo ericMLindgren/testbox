@@ -43,20 +43,39 @@ func (c CodeSubmission) String() string {
 // ExecutionResult contains the outputs (stdouts) of submitted code, as well as an compiler messages (Message).
 // ExecutionResult may contain a grade for the code if the code was tested against a challenge
 type ExecutionResult struct {
-	Stdouts []string `json:"stdouts"`
-	Graded  []grade  `json:"graded,omitempty"`
+	Stdouts []string `json:"stdouts,omitempty"`
+	Grades  []string `json:"grades,omitempty"`
+	Hints   []string `json:"hints,omitempty"`
 	Message message  `json:"message"`
 }
 
-type grade struct {
-	Case   challenges.TestCase `json:"case"`
-	Actual string              `json:"actual"`
-	Grade  string              `json:"grade"`
+func (r *ExecutionResult) grade(c challenges.Challenge, scrub bool) {
+	r.Grades = make([]string, len(r.Stdouts))
+	r.Hints = make([]string, len(r.Stdouts))
+
+	for i, c := range c.Cases {
+		if c.Expect == r.Stdouts[i] {
+			r.Grades[i] = "Pass"
+		} else {
+			r.Grades[i] = "Fail"
+		}
+		r.Hints[i] = c.Desc
+
+	}
+	if scrub { // avoid sending sensative info
+		r.Stdouts = nil
+	}
 }
 
-func (g grade) String() string {
-	return fmt.Sprintf("<grade>Case Expects: '%s' Actual: '%s' Grade: %s", g.Case.Expect, g.Actual, g.Grade)
-}
+// type grade struct {
+// 	Case   challenges.TestCase `json:"case"`
+// 	Actual string              `json:"actual"`
+// 	Grade  string              `json:"grade"`
+// }
+
+// func (g grade) String() string {
+// 	return fmt.Sprintf("<grade>Case Expects: '%s' Actual: '%s' Grade: %s", g.Case.Expect, g.Actual, g.Grade)
+// }
 
 type message struct {
 	Type string `json:"type"`
@@ -306,10 +325,10 @@ func submitToChallenge(w http.ResponseWriter, r *http.Request) {
 
 	// compare stdouts to challenges stdouts
 	// fmt.Printf("about to grade, expecting %v\n", expectedStdouts)
-	// result.Graded = gradeResults(stdins, expectedStdouts, result.Stdouts)
-	result.Graded = gradeResults(c.Cases, result.Stdouts)
+	// result.Grades = gradeResults(stdins, expectedStdouts, result.Stdouts)
+	result.grade(c, true)
 	// fmt.Printf("Suspect challenge: %v", c)
-	// fmt.Printf("Done grading results: %v", result.Graded)
+	// fmt.Printf("Done grading results: %v", result.Grades)
 	// encode and write result back to client
 	resp := new(apiResponse)
 	if err != nil {
@@ -326,21 +345,21 @@ func (r *apiResponse) pack(i interface{}) {
 	r.Result = string(buf)
 }
 
-func gradeResults(cases challenges.CaseList, actual []string) []grade {
-	graded := make([]grade, len(cases))
-	for i, c := range cases {
-		graded[i] = grade{Case: c, Actual: actual[i]}
-		result := cases[i].Expect == actual[i]
+// func gradeResults(cases challenges.CaseList, actual []string) []grade {
+// 	grades := make([]grade, len(cases))
+// 	for i, c := range cases {
+// 		grades[i] = grade{Case: c, Actual: actual[i]}
+// 		result := cases[i].Expect == actual[i]
 
-		if !result {
-			graded[i].Grade = "Fail"
-			continue
-		}
+// 		if !result {
+// 			grades[i].Grade = "Fail"
+// 			continue
+// 		}
 
-		graded[i].Grade = "Pass"
-	}
-	return graded
-}
+// 		grades[i].Grade = "Pass"
+// 	}
+// 	return grades
+// }
 
 func fetchLanguages() map[string]languageDetail {
 	r, err := http.Get(cbAddress + "/languages/")
