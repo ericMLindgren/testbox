@@ -120,11 +120,11 @@ func OpenDB() {
 	}
 	fmt.Printf("DB contains %d challenge(s)\n", countChallenges())
 
-	resetChallengeTable()
+	// resetChallengeTable()
 
-	fmt.Println("inserting dummy challenge...")
-	dummy1 := dummyChallenge()
-	_, _ = Insert(dummy1)
+	// fmt.Println("inserting dummy challenge...")
+	// dummy1 := dummyChallenge()
+	// _, _ = Insert(dummy1)
 }
 
 func testDB() {
