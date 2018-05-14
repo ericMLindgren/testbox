@@ -345,22 +345,6 @@ func (r *apiResponse) pack(i interface{}) {
 	r.Result = string(buf)
 }
 
-// func gradeResults(cases challenges.CaseList, actual []string) []grade {
-// 	grades := make([]grade, len(cases))
-// 	for i, c := range cases {
-// 		grades[i] = grade{Case: c, Actual: actual[i]}
-// 		result := cases[i].Expect == actual[i]
-
-// 		if !result {
-// 			grades[i].Grade = "Fail"
-// 			continue
-// 		}
-
-// 		grades[i].Grade = "Pass"
-// 	}
-// 	return grades
-// }
-
 func fetchLanguages() map[string]languageDetail {
 	r, err := http.Get(cbAddress + "/languages/")
 

@@ -2,6 +2,7 @@ package challenges
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -120,11 +121,15 @@ func OpenDB() {
 	}
 	fmt.Printf("DB contains %d challenge(s)\n", countChallenges())
 
-	// resetChallengeTable()
+	err = resetChallengeTable()
+	if err != nil {
+		fmt.Printf("ERROR: Unable to reset challenge table: %s\n", err.Error())
+		return
+	}
 
-	// fmt.Println("inserting dummy challenge...")
-	// dummy1 := dummyChallenge()
-	// _, _ = Insert(dummy1)
+	fmt.Println("inserting dummy challenge...")
+	dummy1 := dummyChallenge()
+	_, _ = Insert(dummy1)
 }
 
 func testDB() {
@@ -168,22 +173,32 @@ func countChallenges() int {
 	return count
 }
 
-func resetChallengeTable() {
-	removeChallengeTable()
-	err := initChallengesTable()
+func resetChallengeTable() error {
+	err := removeChallengeTable()
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	err = initChallengesTable()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func removeChallengeTable() {
+func removeChallengeTable() error {
 	fmt.Println("Removing old challenges table...")
+	if countChallenges() != 1 {
+		return errors.New("Challenge table has non-trivial entries, delete file manually")
+	}
 	sqlStatement := `DROP TABLE challenges`
 	_, err := db.Exec(sqlStatement)
 	if err != nil {
 		fmt.Printf("error removing table: %s", err.Error())
 	}
 	fmt.Println("Table removed")
+	return nil
 }
 
 func initChallengesTable() error {
