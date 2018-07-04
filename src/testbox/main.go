@@ -89,7 +89,7 @@ type apiResponse struct {
 }
 
 var languages map[string]languageDetail
-var cbAddress string
+var fullAddress string
 
 // // main for production, no cors support as admin page is served here...
 // func main() {
@@ -99,10 +99,10 @@ var cbAddress string
 // 	if !portOk || !addressOk {
 // 		log.Fatal("Missing compilebox environment variables, please make sure service is available")
 // 	}
-// 	cbAddress = address + ":" + port
+// 	fullAddress = address + ":" + port
 
 // 	// Check to ensure the compilebox is up by trying to fill langs variable
-// 	fmt.Printf("Requesting language list from compilebox (%s)...\n", cbAddress)
+// 	fmt.Printf("Requesting language list from compilebox (%s)...\n", fullAddress)
 // 	languages = fetchLanguages()
 
 // 	// routes for admin of challenge db
@@ -137,15 +137,13 @@ var cbAddress string
 // main for testing challenge admin separtely, supports cors
 func main() {
 	// Read settings. Compilebox address/port
-	port, portOk := os.LookupEnv("COMPILEBOX_PORT")
-	address, addressOk := os.LookupEnv("COMPILEBOX_ADDRESS")
-	if !portOk || !addressOk {
-		log.Fatal("Missing compilebox environment variables, please make sure service is available")
-	}
-	cbAddress = address + ":" + port
+	port := getEnv("XAQT_PORT", "31337")
+	address := getEnv("XAQT_ADDRESS", "http://localhost")
+
+	fullAddress = address + ":" + port
 
 	// Check to ensure the compilebox is up by trying to fill langs variable
-	fmt.Printf("Requesting language list from compilebox (%s)...\n", cbAddress)
+	fmt.Printf("Requesting language list from compilebox (%s)...\n", fullAddress)
 	languages = fetchLanguages()
 
 	mux := http.NewServeMux()
@@ -346,7 +344,7 @@ func (r *apiResponse) pack(i interface{}) {
 }
 
 func fetchLanguages() map[string]languageDetail {
-	r, err := http.Get(cbAddress + "/languages/")
+	r, err := http.Get(fullAddress + "/languages/")
 
 	if err != nil {
 		log.Fatal("Unable to contact compilebox, please ensure service is available")
@@ -376,7 +374,7 @@ func execCodeSubmission(s CodeSubmission) (ExecutionResult, error) {
 	buf := bytes.NewBuffer(jsonBytes)
 
 	// send code to compilebox
-	r, err := http.Post(cbAddress+"/eval/", "application/json", buf)
+	r, err := http.Post(fullAddress+"/evaluate/", "application/json", buf)
 	if err != nil {
 		fmt.Printf("error posting to compilebox: %s", err.Error())
 	}

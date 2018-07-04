@@ -71,6 +71,8 @@ func GetRandom() Challenge {
 	n := rand.Intn(countChallenges()) + 1
 	id := int64(n)
 	c, _ := GetById(id) // handle error TODO
+
+	c, _ = GetById(1) // testing purposes only TODO WARNING
 	return c
 }
 
