@@ -33,3 +33,6 @@ pkg/
 
 #vim
 *.swp
+
+.DS_Store
+.*rc
