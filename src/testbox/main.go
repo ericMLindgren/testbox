@@ -97,12 +97,12 @@ var fullAddress string
 // 	port, portOk := os.LookupEnv("COMPILEBOX_PORT")
 // 	address, addressOk := os.LookupEnv("COMPILEBOX_ADDRESS")
 // 	if !portOk || !addressOk {
-// 		log.Fatal("Missing compilebox environment variables, please make sure service is available")
+// 		log.Fatal("Missing xaqt environment variables, please make sure service is available")
 // 	}
 // 	fullAddress = address + ":" + port
 
-// 	// Check to ensure the compilebox is up by trying to fill langs variable
-// 	fmt.Printf("Requesting language list from compilebox (%s)...\n", fullAddress)
+// 	// Check to ensure the xaqt is up by trying to fill langs variable
+// 	fmt.Printf("Requesting language list from xaqt (%s)...\n", fullAddress)
 // 	languages = fetchLanguages()
 
 // 	// routes for admin of challenge db
@@ -142,8 +142,8 @@ func main() {
 
 	fullAddress = address + ":" + port
 
-	// Check to ensure the compilebox is up by trying to fill langs variable
-	fmt.Printf("Requesting language list from compilebox (%s)...\n", fullAddress)
+	// Check to ensure the xaqt is up by trying to fill langs variable
+	fmt.Printf("Requesting language list from xaqt (%s)...\n", fullAddress)
 	languages = fetchLanguages()
 
 	mux := http.NewServeMux()
@@ -179,39 +179,50 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, handler))
 }
 
-// TODO standardize error messaging
 func getChallenge(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Received insert request")
+	fmt.Println("Received getChallenge")
+	resp := new(apiResponse)
 
 	var id challenges.ID
-	decodeSubmission(r, &id)
-
-	fmt.Printf("Challenge id: %s\n", id)
-
-	c, err := challenges.GetById(id)
-
-	resp := new(apiResponse)
+	err := decodeSubmission(r, &id)
 	if err != nil {
 		resp.ErrorMessage = err.Error()
+	} else {
+
+		// If we got a valid submission
+		fmt.Printf(" Challenge id: %s\n", id)
+
+		c, err := challenges.GetById(id)
+
+		if err != nil {
+			resp.ErrorMessage = err.Error()
+		} else {
+			resp.pack(c)
+		}
 	}
-	resp.pack(c)
 
 	jsonWrite(resp, w)
 }
 
 func insertChallenge(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Received insert request")
+	resp := new(apiResponse)
 
 	var c challenges.Challenge
-	decodeSubmission(r, &c)
+	err := decodeSubmission(r, &c)
 
-	fmt.Printf("Challenge struct: %v\n", c)
-
-	id, err := challenges.Insert(&c)
-
-	resp := apiResponse{ID: id}
 	if err != nil {
 		resp.ErrorMessage = err.Error()
+	} else {
+		// Submission is valid:
+		fmt.Printf("Challenge struct: %v\n", c)
+
+		id, err := challenges.Insert(&c)
+
+		resp.ID = id
+		if err != nil {
+			resp.ErrorMessage = err.Error()
+		}
 	}
 
 	jsonWrite(resp, w)
@@ -219,17 +230,21 @@ func insertChallenge(w http.ResponseWriter, r *http.Request) {
 
 func updateChallenge(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Received update request")
+	resp := new(apiResponse)
 
 	var c challenges.Challenge
-	decodeSubmission(r, &c)
+	err := decodeSubmission(r, &c)
 
-	fmt.Printf("Challenge struct: %v\n", c)
-
-	// TODO this is broken... this note is not helpful. broken how?
-	err := challenges.Update(c.ID, &c)
-	resp := apiResponse{}
 	if err != nil {
 		resp.ErrorMessage = err.Error()
+	} else {
+		fmt.Printf("Challenge struct: %v\n", c)
+
+		err := challenges.Update(c.ID, &c)
+
+		if err != nil {
+			resp.ErrorMessage = err.Error()
+		}
 	}
 
 	jsonWrite(resp, w)
@@ -237,16 +252,19 @@ func updateChallenge(w http.ResponseWriter, r *http.Request) {
 
 func deleteChallenge(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Received delete request")
+	resp := new(apiResponse)
 
 	var id challenges.ID
-	decodeSubmission(r, &id)
+	err := decodeSubmission(r, &id)
 
-	// fmt.Printf("Challenge struct: %v\n", c)
-
-	err := challenges.Delete(id)
-	resp := apiResponse{}
 	if err != nil {
 		resp.ErrorMessage = err.Error()
+	} else {
+		// fmt.Printf("Challenge struct: %v\n", c)
+		err := challenges.Delete(id)
+		if err != nil {
+			resp.ErrorMessage = err.Error()
+		}
 	}
 
 	jsonWrite(resp, w)
@@ -256,9 +274,6 @@ func getRandChallenge(w http.ResponseWriter, r *http.Request) {
 	c := challenges.GetRandom()
 	resp := new(apiResponse)
 	resp.pack(c)
-	// if err != nil {
-	// 	resp.ErrorMessage = err.Error()
-	// }
 
 	jsonWrite(resp, w)
 }
@@ -275,64 +290,75 @@ func getLangs(w http.ResponseWriter, r *http.Request) {
 	log.Println("Received languages list request")
 	resp := new(apiResponse)
 	resp.pack(languages)
+
 	jsonWrite(resp, w)
 }
 
 func getStdout(w http.ResponseWriter, r *http.Request) {
 	fmt.Print("Received stdout-only code submission...")
+	resp := new(apiResponse)
 
 	// decode submission
-
 	var submission CodeSubmission
-	decodeSubmission(r, &submission)
+	err := decodeSubmission(r, &submission)
 
-	fmt.Printf("with stdin: %s\n", submission.Stdins[0])
-
-	// send to compilebox
-	result, err := execCodeSubmission(submission)
-	resp := new(apiResponse)
 	if err != nil {
 		resp.ErrorMessage = err.Error()
-	}
-	resp.pack(result)
+	} else {
 
-	// encode and write result back to client
+		fmt.Printf(" with stdin: %s\n", submission.Stdins[0])
+
+		// send to xaqt
+		result, err := execCodeSubmission(submission)
+
+		if err != nil {
+			resp.ErrorMessage = err.Error()
+		} else {
+			resp.pack(result)
+		}
+	}
+
 	jsonWrite(resp, w)
 }
 
 func submitToChallenge(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Received code submission for challenge...")
-
-	var submission CodeSubmission
-	decodeSubmission(r, &submission)
-
-	// fmt.Printf("Code targets challenge %d", submission.ChallengeID)
-	fmt.Println(submission)
-
-	// attach the appropriate challenge's stdins to the submission
-	c, err := challenges.GetById(submission.ChallengeID)
-	if err != nil {
-		panic(err) // TODO handle error more gracefully and pass along to user
-	}
-
-	stdins, _ := c.GetIOSplit()
-	submission.Stdins = stdins
-
-	// send to compilebox
-	result, err := execCodeSubmission(submission)
-
-	// compare stdouts to challenges stdouts
-	// fmt.Printf("about to grade, expecting %v\n", expectedStdouts)
-	// result.Grades = gradeResults(stdins, expectedStdouts, result.Stdouts)
-	result.grade(c, true)
-	// fmt.Printf("Suspect challenge: %v", c)
-	// fmt.Printf("Done grading results: %v", result.Grades)
-	// encode and write result back to client
 	resp := new(apiResponse)
+
+	// Decode client submission
+	var submission CodeSubmission
+	err := decodeSubmission(r, &submission)
 	if err != nil {
 		resp.ErrorMessage = err.Error()
+	} else {
+
+		// attach the appropriate challenge's stdins to the submission
+		c, err := challenges.GetById(submission.ChallengeID)
+		if err != nil {
+			fmt.Printf("Error retrieving challenge: %s\n", err)
+			resp.ErrorMessage = "Testbox internal failure: challenge retrieval"
+			jsonWrite(resp, w)
+			return
+		}
+
+		// pack challenge stdins into submission
+		stdins, _ := c.GetIOSplit()
+		submission.Stdins = stdins
+
+		// send to xaqt
+		result, err := execCodeSubmission(submission)
+
+		if err != nil {
+			// if trouble exec'ing, just send error
+			resp.ErrorMessage = err.Error()
+			jsonWrite(resp, w)
+		} else {
+			// grade + pack results
+			result.grade(c, true)
+			resp.pack(result)
+		}
 	}
-	resp.pack(result)
+
 	jsonWrite(resp, w)
 }
 
@@ -347,7 +373,7 @@ func fetchLanguages() map[string]languageDetail {
 	r, err := http.Get(fullAddress + "/languages/")
 
 	if err != nil {
-		log.Fatal("Unable to contact compilebox, please ensure service is available")
+		log.Fatal(fmt.Sprintf("Unable to contact xaqt, please ensure service is available:\n%s", err))
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -356,7 +382,7 @@ func fetchLanguages() map[string]languageDetail {
 	var l map[string]languageDetail
 	err = decoder.Decode(&l)
 	if err != nil {
-		panic(err)
+		log.Fatal(fmt.Sprintf("Unable to decode xaqt response to language list request:\n%s", err))
 	}
 
 	supportedLangs := make([]string, 0, len(l))
@@ -373,19 +399,23 @@ func execCodeSubmission(s CodeSubmission) (ExecutionResult, error) {
 	jsonBytes, _ := json.MarshalIndent(s, "", "   ")
 	buf := bytes.NewBuffer(jsonBytes)
 
-	// send code to compilebox
+	// send code to xaqt
 	r, err := http.Post(fullAddress+"/evaluate/", "application/json", buf)
 	if err != nil {
-		fmt.Printf("error posting to compilebox: %s", err.Error())
+		fmt.Printf("error posting to xaqt: %s\n", err.Error())
+		return ExecutionResult{}, err
 	}
 
 	// decode response
 	decoder := json.NewDecoder(r.Body)
-	var result ExecutionResult
-	derr := decoder.Decode(&result)
 	defer r.Body.Close()
-	if derr != nil {
-		fmt.Printf("error decoding compilebox response: %s", derr.Error())
+
+	var result ExecutionResult
+	err = decoder.Decode(&result)
+
+	if err != nil {
+		fmt.Printf("error decoding xaqt response: %s\n", err.Error())
+		return ExecutionResult{}, err
 	}
 
 	// return result
@@ -402,15 +432,16 @@ func jsonWrite(v interface{}, w http.ResponseWriter) {
 	w.Write(buf)
 }
 
-func decodeSubmission(r *http.Request, s interface{}) {
+func decodeSubmission(r *http.Request, s interface{}) error {
 	decoder := json.NewDecoder(r.Body)
-	// var submission CodeSubmission
-	err := decoder.Decode(&s)
 	defer r.Body.Close()
+
+	err := decoder.Decode(&s)
+
 	if err != nil {
-		panic(err)
+		return err
 	}
-	// return submission
+	return nil
 }
 
 func getEnv(key, fallback string) string {
