@@ -1,3 +1,8 @@
+# Executable
+testbox
+# vim tags
+tags
+
 # Logs
 logs
 *.log

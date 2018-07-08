@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"challenges"
+	"github.com/ericMLindgren/testbox/internal/challenges"
 
 	"github.com/rs/cors"
 )
